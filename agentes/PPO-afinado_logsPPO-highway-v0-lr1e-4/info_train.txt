@@ -1,0 +1,8 @@
+Informacion sobre el experimento PPO-afinado_logsPPO-highway-v0-lr1e-4
+
+ - Duracion: 547.52 segundos (14 entornos en paralelo).
+ - Etapas del curriculo:
+	etapa3_highway_v0: 7000 pasos, 182 episodios en highway-v0 {}, recompensa media en validacion 30.69, 548 s
+ - Modelo inicial: logs/PPO/best_model.zip
+ - Hiperparametros:
+	{'learning_rate': 0.0001, 'n_steps': 512, 'batch_size': 128, 'n_epochs': 10, 'gamma': 0.8894510540261614, 'gae_lambda': 0.9, 'ent_coef': 0.01499279403481687, 'vf_coef': 0.9679390714537148, 'clip_range': 0.1, 'policy_kwargs': {'net_arch': [256, 256]}}
