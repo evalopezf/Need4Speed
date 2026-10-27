@@ -27,8 +27,16 @@ ALGORITHMS = {"PPO": PPO}
 
 # Modifica estos rangos para definir el estudio de Optuna.
 OPTUNA_CONFIG = {
-    "learning_rate": (1e-5, 1e-3),
-    "gamma": (0.90, 0.999),
+    "learning_rate": (1e-4, 1e-3),
+    "gamma": (0.80, 0.99),
+    "n_steps": [128, 256, 512],
+    "batch_size": [32, 64, 128],
+    "n_epochs": [5, 10],
+    "clip_range": [0.1, 0.2, 0.3],
+    "gae_lambda": [0.9, 0.95, 1.0],
+    "ent_coef": (1e-4, 5e-2),
+    "vf_coef": (0.25, 1.0),
+    "net_arch": ["64x64", "128x128", "256x256"],
 }
 
 
@@ -61,39 +69,30 @@ def make_env(env_name: str, vehicles_count: int, seed: int | None = None):
 
 
 def suggest_hyperparameters(trial: optuna.Trial, algorithm: str) -> dict:
-    learning_rate = trial.suggest_float(
-        "learning_rate",
-        OPTUNA_CONFIG["learning_rate"][0],
-        OPTUNA_CONFIG["learning_rate"][1],
-        log=True,
-    )
-    gamma = trial.suggest_float(
-        "gamma",
-        OPTUNA_CONFIG["gamma"][0],
-        OPTUNA_CONFIG["gamma"][1],
-    )
+    learning_rate = trial.suggest_float("learning_rate", *OPTUNA_CONFIG["learning_rate"], log=True)
+    gamma = trial.suggest_float("gamma", *OPTUNA_CONFIG["gamma"])
+    n_steps = trial.suggest_categorical("n_steps", OPTUNA_CONFIG["n_steps"])
+    batch_size = trial.suggest_categorical("batch_size", OPTUNA_CONFIG["batch_size"])
+    n_epochs = trial.suggest_categorical("n_epochs", OPTUNA_CONFIG["n_epochs"])
+    clip_range = trial.suggest_categorical("clip_range", OPTUNA_CONFIG["clip_range"])
+    gae_lambda = trial.suggest_categorical("gae_lambda", OPTUNA_CONFIG["gae_lambda"])
+    ent_coef = trial.suggest_float("ent_coef", *OPTUNA_CONFIG["ent_coef"], log=True)
+    vf_coef = trial.suggest_float("vf_coef", *OPTUNA_CONFIG["vf_coef"])
+    net_arch = trial.suggest_categorical("net_arch", OPTUNA_CONFIG["net_arch"])
+    hidden_layers = [int(size) for size in net_arch.split("x")]
 
     params = {
         "learning_rate": learning_rate,
         "gamma": gamma,
+        "n_steps": n_steps,
+        "batch_size": batch_size,
+        "n_epochs": n_epochs,
+        "clip_range": clip_range,
+        "gae_lambda": gae_lambda,
+        "ent_coef": ent_coef,
+        "vf_coef": vf_coef,
+        "policy_kwargs": {"net_arch": hidden_layers},
     }
-
-    if algorithm == "DQN":
-        params.update(
-            buffer_size=trial.suggest_categorical("buffer_size", [5_000, 10_000, 50_000]),
-            learning_starts=trial.suggest_categorical("learning_starts", [100, 500]),
-            batch_size=trial.suggest_categorical("batch_size", [32, 64]),
-            target_update_interval=trial.suggest_categorical(
-                "target_update_interval", [250, 500, 1_000]
-            ),
-        )
-    else:
-        params.update(
-            n_steps=trial.suggest_categorical("n_steps", [64, 128, 256]),
-            ent_coef=trial.suggest_float("ent_coef", 1e-4, 1e-2, log=True),
-        )
-        if algorithm == "PPO":
-            params["batch_size"] = trial.suggest_categorical("batch_size", [32, 64])
 
     return params
 
