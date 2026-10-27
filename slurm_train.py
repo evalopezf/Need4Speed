@@ -2,13 +2,14 @@
 """Entrenamiento de highway-env con Optuna, preparado para Slurm.
 
 Ejemplo:
-    python slurm_train.py --algorithm DQN --vehicles-count 20 \
-        --experiment-name DQN-20-cars --n-combinations 10
+    python slurm_train.py --algorithm PPO --vehicles-count 20 \
+        --experiment-name PPO-20-cars --trials-per-task 1
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import random
 import time
@@ -18,11 +19,11 @@ import gymnasium as gym
 import highway_env  # noqa: F401
 import numpy as np
 import optuna
-from stable_baselines3 import A2C, DQN, PPO
+from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 
-ALGORITHMS = {"A2C": A2C, "DQN": DQN, "PPO": PPO}
+ALGORITHMS = {"PPO": PPO}
 
 # Modifica estos rangos para definir el estudio de Optuna.
 OPTUNA_CONFIG = {
@@ -33,12 +34,14 @@ OPTUNA_CONFIG = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--algorithm", choices=sorted(ALGORITHMS), default="DQN")
+    parser.add_argument("--algorithm", choices=sorted(ALGORITHMS), default="PPO")
     parser.add_argument("--env-name", default="highway-fast-v0")
     parser.add_argument("--vehicles-count", type=int, default=20)
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--train-episodes", type=int, default=100)
-    parser.add_argument("--n-combinations", type=int, default=10)
+    parser.add_argument("--trials-per-task", type=int, default=1)
+    parser.add_argument("--study-name", default="ppo_highway")
+    parser.add_argument("--storage-path", type=Path, default=Path("agentes/optuna_ppo.db"))
     parser.add_argument("--eval-episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", type=Path, default=Path("agentes"))
@@ -124,6 +127,7 @@ def main() -> None:
 
     experiment_dir = args.output_dir / args.experiment_name
     experiment_dir.mkdir(parents=True, exist_ok=True)
+    args.storage_path.parent.mkdir(parents=True, exist_ok=True)
 
     timesteps_per_episode = 30 if args.env_name == "highway-fast-v0" else 40
     total_timesteps = args.train_episodes * timesteps_per_episode
@@ -170,11 +174,19 @@ def main() -> None:
         finally:
             train_env.close()
 
-    study = optuna.create_study(
-        direction="maximize",
-        sampler=optuna.samplers.TPESampler(seed=args.seed),
-    )
-    study.optimize(objective, n_trials=args.n_combinations, n_jobs=1)
+    storage = f"sqlite:///{args.storage_path.resolve()}"
+    storage_lock_path = args.storage_path.with_suffix(args.storage_path.suffix + ".lock")
+    with storage_lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        study = optuna.create_study(
+            study_name=args.study_name,
+            storage=storage,
+            load_if_exists=True,
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(seed=args.seed),
+        )
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+    study.optimize(objective, n_trials=args.trials_per_task, n_jobs=1)
 
     duration = time.time() - start_time
     summary = {
@@ -183,7 +195,7 @@ def main() -> None:
         "environment": args.env_name,
         "vehicles_count": args.vehicles_count,
         "train_episodes": args.train_episodes,
-        "combinations": args.n_combinations,
+        "trials_per_task": args.trials_per_task,
         "duration_seconds": round(duration, 2),
         "best_reward": study.best_value,
         "best_params": study.best_params,

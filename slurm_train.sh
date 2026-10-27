@@ -1,42 +1,49 @@
-#!/usr/bin/env bash
-#SBATCH --job-name=need4speed
-#SBATCH --array=0-3
+#!/bin/bash
+#
+#SBATCH -p special
+#SBATCH --array=0-7%8
+#SBATCH -J hackaton_prueba
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=4G
-#SBATCH --time=02:00:00
-#SBATCH --output=logs/slurm-%A_%a.out
-
+#SBATCH --mem=4000M
+#SBATCH -o /lustre/home/cebas/emlopez/hackaton/slurm-%A_%a.out
+#SBATCH --error=/lustre/home/cebas/emlopez/hackaton/slurm-%A_%a.err
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="/lustre/home/cebas/emlopez/hackaton/"
 cd "$ROOT_DIR"
 
-# Si el cluster utiliza modules, carga aqui Python y el entorno virtual.
-# module load python
-# source .venv/bin/activate
+module load rama0.4 GCCcore/14.2.0 Python/3.13.1
 
-RUN_NAMES=(
-    "DQN-fast-20-cars"
-    "PPO-fast-20-cars"
-    "A2C-fast-20-cars"
-    "DQN-fast-no-cars"
-)
-ALGORITHMS=("DQN" "PPO" "A2C" "DQN")
-VEHICLES_COUNT=(20 20 20 0)
+VENV_DIR="/lustre/home/cebas/emlopez/hackaton/.venv-slurm"
+VENV_LOCK="/lustre/home/cebas/emlopez/hackaton/.venv-slurm.lock"
+exec 9>"$VENV_LOCK"
+flock -x 9
+
+if [[ ! -x "$VENV_DIR/bin/python" ]]; then
+    python3 -m venv "$VENV_DIR"
+fi
+
+source "$VENV_DIR/bin/activate"
+python -m pip install --disable-pip-version-check -r "$ROOT_DIR/requirements-slurm.txt"
+flock -u 9
+
+RUN_NAME="PPO-hyperparams"
+ALGORITHM="PPO"
+VEHICLES=20
 
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-RUN_NAME="${RUN_NAMES[$TASK_ID]}"
-ALGORITHM="${ALGORITHMS[$TASK_ID]}"
-VEHICLES="${VEHICLES_COUNT[$TASK_ID]}"
 
-mkdir -p logs agentes
+mkdir -p "$ROOT_DIR/agentes"
 
-python3 slurm_train.py \
+python slurm_train.py \
     --algorithm "$ALGORITHM" \
     --env-name highway-fast-v0 \
     --vehicles-count "$VEHICLES" \
     --experiment-name "$RUN_NAME" \
     --train-episodes 100 \
-    --n-combinations 10 \
+    --trials-per-task 1 \
     --eval-episodes 10 \
-    --seed 42
+    --study-name "ppo_highway" \
+    --storage-path "$ROOT_DIR/agentes/optuna_ppo.db" \
+    --seed $((42 + TASK_ID)) \
+    --output-dir "$ROOT_DIR/agentes"
