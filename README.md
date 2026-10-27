@@ -1,3 +1,10 @@
+# Need4Speed
+
+Need4Speed es un proyecto desarrollado en el marco del [Hackatón Momentum](https://aprende.csic.es/catalogo/hackaton-momentum/), organizado por CSIC Aprende.
+Es una experiencia intensiva de aprendizaje e innovación colaborativa en Granada.
+El reto se centra en diseñar y entrenar modelos de Aprendizaje por Refuerzo Profundo (DRL).
+En este proyecto desarrollamos agentes para entornos de simulación mediante trabajo en equipo.
+
 # Contenido
 
 ## Material didáctico
