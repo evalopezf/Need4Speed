@@ -27,11 +27,11 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --disable-pip-version-check -r "$ROOT_DIR/requirements-slurm.txt"
 flock -u 9
 
-RUN_NAME="PPO-hyperparams"
 ALGORITHM="PPO"
 VEHICLES=20
 
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
+RUN_NAME=RUN_NAME="PPO-hyperparams-${TASK_ID}"
 
 mkdir -p "$ROOT_DIR/agentes"
 
