@@ -1,0 +1,7 @@
+Informacion sobre el experimento PPO-1000_episodes-fast_env-non_stop
+
+ - Duracion: 448.01 segundos.
+ - La mejor recompensa obtenida ha sido: 18.54
+ - Se han probado 1 combinaciones de hiperparametros.
+ - Los hiperparametros del mejor modelo encontrado son:
+	{}
